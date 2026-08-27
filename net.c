@@ -450,6 +450,14 @@ int perform_server_greeting(int fd, struct smtp_features* features) {
 
 	int res = read_remote(fd, sizeof(buffer) - 1, buffer);
 
+	if (!(config.features & LMTP) && res == 5) {
+		/* HELO fallback for SMTP servers without ESMTP support */
+		syslog(LOG_DEBUG, "EHLO rejected, falling back to HELO");
+		memset(buffer, 0, sizeof(buffer)); /* Clear answer to EHLO */
+		send_remote_command(fd, "HELO %s", hostname());
+		res = read_remote(fd, sizeof(buffer) - 1, buffer);
+	}
+
 	// Got an unexpected response
 	if (res != 2)
 		return -1;
