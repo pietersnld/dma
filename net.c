@@ -439,10 +439,6 @@ static void parse_auth_line(char* line, struct smtp_auth_mechanisms* auth) {
 }
 
 int perform_server_greeting(int fd, struct smtp_features* features) {
-	/*
-		Send EHLO
-		XXX allow HELO fallback
-	*/
 	send_remote_command(fd, "%s %s", config.features & LMTP ? "LHLO" : "EHLO", hostname());
 
 	char buffer[EHLO_RESPONSE_SIZE];
@@ -450,11 +446,10 @@ int perform_server_greeting(int fd, struct smtp_features* features) {
 
 	int res = read_remote(fd, sizeof(buffer) - 1, buffer);
 
-	if (!(config.features & LMTP) && res == 5) {
-		/* HELO fallback for SMTP servers without ESMTP support */
+	if (res == 5 && (config.features & LMTP) == 0) {
 		syslog(LOG_DEBUG, "EHLO rejected, falling back to HELO");
-		memset(buffer, 0, sizeof(buffer)); /* Clear answer to EHLO */
 		send_remote_command(fd, "HELO %s", hostname());
+		memset(buffer, 0, sizeof(buffer));
 		res = read_remote(fd, sizeof(buffer) - 1, buffer);
 	}
 
