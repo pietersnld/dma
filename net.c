@@ -439,16 +439,19 @@ static void parse_auth_line(char* line, struct smtp_auth_mechanisms* auth) {
 }
 
 int perform_server_greeting(int fd, struct smtp_features* features) {
-	/*
-		Send EHLO
-		XXX allow HELO fallback
-	*/
 	send_remote_command(fd, "%s %s", config.features & LMTP ? "LHLO" : "EHLO", hostname());
 
 	char buffer[EHLO_RESPONSE_SIZE];
 	memset(buffer, 0, sizeof(buffer));
 
 	int res = read_remote(fd, sizeof(buffer) - 1, buffer);
+
+	if (res == 5 && (config.features & LMTP) == 0) {
+		syslog(LOG_DEBUG, "EHLO rejected, falling back to HELO");
+		send_remote_command(fd, "HELO %s", hostname());
+		memset(buffer, 0, sizeof(buffer));
+		res = read_remote(fd, sizeof(buffer) - 1, buffer);
+	}
 
 	// Got an unexpected response
 	if (res != 2)
